@@ -21,6 +21,6 @@ jobs:
       
       - name: Install pytest
         run: pip install pytest
-      
-      - name: Run smoke tests
-        run: pytest tests/test_smoke.py -v
+
+      - name: Run tests
+        run: pytest tests/ -v -m "not benchmark"
