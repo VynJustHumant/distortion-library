@@ -51,5 +51,5 @@ Testing
 bash
 pytest tests/ -v -m "not benchmark"
 ```
-License
+## License
 MIT — see LICENSE.
