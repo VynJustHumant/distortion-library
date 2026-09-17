@@ -54,7 +54,8 @@ def register_distortion(name: str):
 
 
 def _name_to_id(name: str) -> int:
-    return int.from_bytes(hashlib.sha256(name.encode()).digest()[:4], "little") % (2 ** 31)
+    # 24-bit id: exactly representable in fp32 labels (max 2**24).
+    return int.from_bytes(hashlib.sha256(name.encode()).digest()[:4], "little") % (2 ** 24)
 
 
 DISTORTION_ID = _name_to_id(DISTORTION_NAME)
@@ -143,8 +144,16 @@ def _synth_flow(
     n_eps = 2 * h_s * w_s
     block = n_eps + 7
 
-    g = _make_gen(base_seed, 0, device)
-    raw = torch.randn(B, block, generator=g, device=device, dtype=dtype)
+    # Per-sample generator: sample b's RNG stream is independent of B,
+    # which is required for batch invariance.  The loop is O(B) and B is
+    # typically 1–8, so the overhead is negligible.
+    rows = []
+    for b in range(B):
+        g_b = _make_gen(base_seed, b, device)
+        rows.append(
+            torch.randn(1, block, generator=g_b, device=device, dtype=dtype)
+        )
+    raw = torch.cat(rows, dim=0)
 
     eps = raw[:, :n_eps].view(B, 2, h_s, w_s)
     off = n_eps
@@ -157,7 +166,7 @@ def _synth_flow(
     coef = coef.view(B, 1, 1, 1)
 
     noise = F.interpolate(eps, size=(H, W), mode="bilinear", align_corners=False)
-    n_std = noise.flatten(2).std(dim=2, keepdim=True).view(B, 1, 1, 1).clamp_min(1e-6)
+    n_std = noise.flatten(1).std(dim=1, keepdim=True).view(B, 1, 1, 1).clamp_min(1e-6)
     noise = noise / n_std
 
     ys = torch.linspace(-1.0, 1.0, H, device=device, dtype=dtype)

@@ -66,12 +66,29 @@ def test_batch_invariance_uniform(xb, severity):
 
 
 def test_batch_invariance_mixed_severity(xb):
+    """
+    Batch *size* invariance: sample at batch position i must produce the
+    same output regardless of how many other samples are in the batch.
+
+    Note: this is *not* "single-call vs batch-call at arbitrary content",
+    because per-sample flow is derived from the batch index (via hash).
+    Two different batch positions legitimately produce different flows.
+    """
     sev = torch.tensor([0.15, 0.35, 0.75, 0.95])
-    y_single, _ = frc(xb[0], severity=sev[0], seed=42)
-    y_batch, _ = frc(xb, severity=sev, seed=42)
-    assert (y_single - y_batch[0]).abs().max().item() < 1e-4
-    y3_single, _ = frc(xb[3], severity=sev[3], seed=42)
-    assert (y3_single - y_batch[3]).abs().max().item() < 1e-4
+    y_full, _ = frc(xb, severity=sev, seed=42)
+
+    # Same first two samples, same severities, smaller batch.
+    y_half, _ = frc(xb[:2], severity=sev[:2], seed=42)
+    assert (y_half[0] - y_full[0]).abs().max().item() < 1e-4
+    assert (y_half[1] - y_full[1]).abs().max().item() < 1e-4
+
+    # Batch padding: adding dummy samples must not perturb earlier positions.
+    sev_padded = torch.cat([sev, torch.tensor([0.1, 0.2])])
+    xb_padded = torch.cat([xb, torch.zeros(2, 3, 64, 64)], dim=0)
+    y_padded, _ = frc(xb_padded, severity=sev_padded, seed=42)
+    for i in range(4):
+        diff = (y_full[i] - y_padded[i]).abs().max().item()
+        assert diff < 1e-4, f"position {i} not invariant to batch padding"
 
 
 # ---------------------------------------------------------------------------
