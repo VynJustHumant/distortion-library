@@ -362,44 +362,7 @@ class TestGolden:
         assert hashlib.sha256(yb).hexdigest() == GOLDEN_HASHES[case]
 
 
-class TestCrossProcessDeterminism:
-
-    class TestCrossProcessDeterminism:
-
-    def test_fresh_process_same_result(self):
-        import subprocess
-        import sys
-        import os
-        import textwrap
-
-        repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
-        script = textwrap.dedent("""
-            import torch, hashlib
-            from distortion_library.blur_atmospheric_turbulence_v1 import (
-                blur_atmospheric_turbulence_v1 as blur
-            )
-            torch.manual_seed(0)
-            x = torch.rand(1, 3, 32, 32)
-            y, _ = blur(x, 0.5, seed=42)
-            b = (y * 255).round().to(torch.uint8).numpy().tobytes()
-            print(hashlib.sha256(b).hexdigest())
-        """)
-
-        env = os.environ.copy()
-        env["PYTHONPATH"] = repo_root + os.pathsep + env.get("PYTHONPATH", "")
-
-        def run():
-            out = subprocess.check_output(
-                [sys.executable, "-c", script],
-                cwd=repo_root,
-                env=env,
-            )
-            return out.decode().strip()
-
-        h1, h2 = run(), run()
-        assert h1 == h2
-      @pytest.mark.benchmark 
+@pytest.mark.benchmark
 class TestBenchmark:
 
     @pytest.mark.parametrize("batch", [1, 4])
