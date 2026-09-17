@@ -364,13 +364,14 @@ class TestGolden:
 
 class TestCrossProcessDeterminism:
 
+    class TestCrossProcessDeterminism:
+
     def test_fresh_process_same_result(self):
         import subprocess
         import sys
         import os
         import textwrap
 
-        # Root repo = parent dari folder tests/
         repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
         script = textwrap.dedent("""
@@ -385,7 +386,6 @@ class TestCrossProcessDeterminism:
             print(hashlib.sha256(b).hexdigest())
         """)
 
-        # Subprocess inherit PYTHONPATH + cwd = repo root
         env = os.environ.copy()
         env["PYTHONPATH"] = repo_root + os.pathsep + env.get("PYTHONPATH", "")
 
@@ -399,9 +399,7 @@ class TestCrossProcessDeterminism:
 
         h1, h2 = run(), run()
         assert h1 == h2
-
-
-@pytest.mark.benchmark
+      @pytest.mark.benchmark 
 class TestBenchmark:
 
     @pytest.mark.parametrize("batch", [1, 4])
