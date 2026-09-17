@@ -57,6 +57,13 @@ distorted, label = blur_frc_optical_flow_v1(video, severity=0.5, seed=42)
 
 ## Visual Output
 
+### Atmospheric Turbulence Blur — Severity Sweep
+
+![Atmospheric Turbulence Sweep](examples/outputs/sweep_atmospheric.png)
+
+Input image followed by seven increasing severities (0.05 → 1.00).
+Heat shimmer and tilt displacement become visible from s ≈ 0.30 onward.
+
 ### FRC Optical Flow Blur — Severity Sweep
 
 ![FRC Severity Sweep](examples/outputs/sweep_frc_optical_flow.png)
