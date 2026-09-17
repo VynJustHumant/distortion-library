@@ -50,5 +50,6 @@ pip install -r requirements.txt
 Testing
 bash
 pytest tests/ -v -m "not benchmark"
+```
 License
 MIT — see LICENSE.
