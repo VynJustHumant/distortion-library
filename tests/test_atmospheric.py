@@ -2,11 +2,6 @@
 tests/test_atmospheric.py
 =========================
 Pytest suite for blur_atmospheric_turbulence_v1.
-
-Jalankan:
-    pytest tests/test_atmospheric.py -v
-    pytest tests/test_atmospheric.py -v -m "not benchmark"
-    pytest tests/test_atmospheric.py -v -m benchmark
 """
 
 from __future__ import annotations
@@ -24,9 +19,6 @@ from distortion_library.blur_atmospheric_turbulence_v1 import (
 )
 
 
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
 @pytest.fixture
 def x_rgb():
     torch.manual_seed(0)
@@ -45,9 +37,6 @@ def x_fp64():
     return torch.rand(1, 3, 32, 32, dtype=torch.float64, requires_grad=True)
 
 
-# ---------------------------------------------------------------------------
-# 1. Shape / dtype / device / memory-format
-# ---------------------------------------------------------------------------
 class TestShapeDtypeDevice:
 
     def test_shape_preserved_3d(self):
@@ -75,29 +64,22 @@ class TestShapeDtypeDevice:
         y, _ = blur(x, 0.5, seed=1)
         assert y.is_contiguous(memory_format=torch.channels_last)
 
-    # ---- FIX #7: squeeze + channels_last interaction ----------------------
     def test_squeeze_preserves_shape(self):
-        """3D input → 3D output (tidak jadi 4D)."""
         x = torch.rand(3, 32, 32)
         y, lab = blur(x, 0.5, seed=1)
-        assert y.shape == x.shape       # (3, 32, 32), bukan (1, 3, 32, 32)
-        assert lab.shape == (2,)         # bukan (1, 2)
+        assert y.shape == x.shape
+        assert lab.shape == (2,)
 
     def test_squeeze_channels_last_ignored(self):
-        """3D input: channels_last tidak berlaku (butuh 4D), jangan error."""
         x = torch.rand(3, 32, 32)
-        # 3D contiguous — memory_format 'channels_last' tidak terdefinisi
-        # untuk 3D, jadi fungsi harus fallback ke contiguous biasa.
         y, _ = blur(x, 0.5, seed=1)
         assert y.shape == x.shape
         assert y.is_contiguous()
 
     def test_4d_channels_last_to_3d_roundtrip(self):
-        """4D CL → 3D squeeze → tetap valid shape & values."""
         x4 = torch.rand(1, 3, 32, 32).contiguous(memory_format=torch.channels_last)
         y4, _ = blur(x4, 0.5, seed=1)
         assert y4.is_contiguous(memory_format=torch.channels_last)
-        # squeeze hasilnya tetap benar
         y3 = y4.squeeze(0)
         assert y3.shape == (3, 32, 32)
 
@@ -114,9 +96,6 @@ class TestShapeDtypeDevice:
         assert y.dtype == dt
 
 
-# ---------------------------------------------------------------------------
-# 2. Range / identity / monotonicity
-# ---------------------------------------------------------------------------
 class TestRangeIdentityMonotonic:
 
     def test_output_range(self, x_batch4):
@@ -131,7 +110,6 @@ class TestRangeIdentityMonotonic:
         assert y.min().item() >= 0.0
         assert y.max().item() <= 255.0
 
-    # ---- FIX #6: value_range non-standard pada BATCH ----------------------
     def test_value_range_255_batch(self):
         x = torch.rand(4, 3, 32, 32) * 255.0
         y, lab = blur(x, 0.5, seed=1, value_range=(0.0, 255.0))
@@ -141,30 +119,19 @@ class TestRangeIdentityMonotonic:
         assert lab.shape == (4, 2)
 
     def test_value_range_asymmetric(self):
-        """value_range = (-1, 1) → output harus di [-1, 1]."""
         x = torch.rand(2, 3, 32, 32) * 2.0 - 1.0
         y, _ = blur(x, 0.5, seed=1, value_range=(-1.0, 1.0))
         assert y.min().item() >= -1.0 - 1e-5
         assert y.max().item() <= 1.0 + 1e-5
 
-    # ---- FIX #3: toleransi diperketat -------------------------------------
     def test_identity_at_low_severity(self):
-        """
-        severity=0.01 → blend weight s=0.01, jadi output = 0.99·x + 0.01·x_dist.
-        Beda maksimum karena turbulence pada severity ini sangat kecil
-        (~1% dari kontribusi distorted). Toleransi 0.008 cukup ketat tapi
-        tidak flaky untuk fp32.
-        """
         x = torch.rand(1, 3, 64, 64)
         y, _ = blur(x, 0.01, seed=1)
         assert (y - x).abs().mean() < 0.008
 
     def test_identity_at_low_severity_exact_weight(self):
-        """Cek bahwa blend benar-benar (1-s)·x + s·x_dist dengan s=0.01."""
         x = torch.rand(1, 3, 64, 64)
         y, lab = blur(x, 0.01, seed=1)
-        # s efektif = 0.01 (clamp lower bound)
-        # output = 0.99·x + 0.01·x_distorted → selisih maksimum ≤ 0.01·|x_d - x| ≤ 0.01
         assert (y - x).abs().max().item() <= 0.01 + 1e-5
 
     def test_monotonic_in_severity(self):
@@ -180,9 +147,6 @@ class TestRangeIdentityMonotonic:
         assert mses[-1] > mses[0] + 1e-3
 
 
-# ---------------------------------------------------------------------------
-# 3. Determinism + batch invariance
-# ---------------------------------------------------------------------------
 class TestDeterminismBatchInvariance:
 
     def test_determinism_same_seed(self, x_batch4):
@@ -232,9 +196,6 @@ class TestDeterminismBatchInvariance:
             blur(x_rgb.cuda(), 0.5, generator=gc)
 
 
-# ---------------------------------------------------------------------------
-# 4. Differentiability
-# ---------------------------------------------------------------------------
 class TestDifferentiability:
 
     def test_gradcheck_fp64(self, x_fp64):
@@ -265,9 +226,6 @@ class TestDifferentiability:
         assert y.grad_fn is not None
 
 
-# ---------------------------------------------------------------------------
-# 5. Robustness
-# ---------------------------------------------------------------------------
 class TestRobustness:
 
     def test_nan_inf_input(self):
@@ -278,12 +236,9 @@ class TestRobustness:
         y, _ = blur(x, 0.5, seed=1)
         assert torch.isfinite(y).all()
 
-    # ---- FIX #4: toleransi fp32 untuk 0.01 --------------------------------
     def test_severity_out_of_range_low(self, x_rgb):
         y, lab = blur(x_rgb, -5.0, seed=1)
         assert torch.isfinite(y).all()
-        # fp32 tidak eksak untuk 0.01 → abs=1e-5 cukup longgar untuk lolos,
-        # cukup ketat untuk menangkap perubahan clamp.
         assert lab[0, 1].item() == pytest.approx(0.01, abs=1e-5)
 
     def test_severity_out_of_range_high(self, x_rgb):
@@ -318,9 +273,6 @@ class TestRobustness:
         assert y.shape == x.shape
 
 
-# ---------------------------------------------------------------------------
-# 6. Integer dtype
-# ---------------------------------------------------------------------------
 class TestIntegerDtype:
 
     def test_uint8_no_truncate(self):
@@ -337,9 +289,6 @@ class TestIntegerDtype:
         assert y.max().item() <= 4095
 
 
-# ---------------------------------------------------------------------------
-# 7. Kwargs override
-# ---------------------------------------------------------------------------
 class TestKwargsOverride:
 
     def test_disp_scale_override(self, x_rgb):
@@ -357,9 +306,6 @@ class TestKwargsOverride:
         assert torch.isfinite(y).all()
 
 
-# ---------------------------------------------------------------------------
-# 8. Label
-# ---------------------------------------------------------------------------
 class TestLabel:
 
     def test_label_has_no_grad(self, x_rgb):
@@ -380,9 +326,6 @@ class TestLabel:
         assert lab_cpu.device.type == "cpu"
 
 
-# ---------------------------------------------------------------------------
-# 9. Registry
-# ---------------------------------------------------------------------------
 class TestRegistry:
 
     def test_registered(self):
@@ -394,25 +337,10 @@ class TestRegistry:
         assert _ID > 0
 
 
-# ---------------------------------------------------------------------------
-# 10. Golden regression
-# ---------------------------------------------------------------------------
-# ---- FIX #1: hash placeholder diganti dengan generator script ---------
-# Isi nilai di bawah dengan menjalankan `python scripts/generate_golden.py`.
-# Nilai contoh (DIGANTI setelah run pertama di environment referensi):
-GOLDEN_HASHES = {
-    # (1, 3, 32, 32, 0.0, 42): '<sha256>',
-    # (1, 3, 32, 32, 0.5, 42): '<sha256>',
-    # (2, 3, 32, 32, 1.0, 42): '<sha256>',
-}
+GOLDEN_HASHES = {}
 
 
 class TestGolden:
-    """
-    Golden values di-hard-code dari scripts/generate_golden.py.
-    Kalau GOLDEN_HASHES kosong (belum di-generate), seluruh class di-skip
-    dengan pesan yang jelas — bukan silently skip per-case.
-    """
 
     @pytest.fixture(autouse=True)
     def _require_hashes(self):
@@ -434,15 +362,16 @@ class TestGolden:
         assert hashlib.sha256(yb).hexdigest() == GOLDEN_HASHES[case]
 
 
-# ---------------------------------------------------------------------------
-# 11. Cross-process determinism
-# ---------------------------------------------------------------------------
 class TestCrossProcessDeterminism:
 
     def test_fresh_process_same_result(self):
         import subprocess
         import sys
+        import os
         import textwrap
+
+        # Root repo = parent dari folder tests/
+        repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
         script = textwrap.dedent("""
             import torch, hashlib
@@ -456,17 +385,22 @@ class TestCrossProcessDeterminism:
             print(hashlib.sha256(b).hexdigest())
         """)
 
+        # Subprocess inherit PYTHONPATH + cwd = repo root
+        env = os.environ.copy()
+        env["PYTHONPATH"] = repo_root + os.pathsep + env.get("PYTHONPATH", "")
+
         def run():
-            out = subprocess.check_output([sys.executable, "-c", script])
+            out = subprocess.check_output(
+                [sys.executable, "-c", script],
+                cwd=repo_root,
+                env=env,
+            )
             return out.decode().strip()
 
         h1, h2 = run(), run()
         assert h1 == h2
 
 
-# ---------------------------------------------------------------------------
-# 12. Benchmark  — FIX #2 + #5: registered marker + parametrised
-# ---------------------------------------------------------------------------
 @pytest.mark.benchmark
 class TestBenchmark:
 
@@ -475,7 +409,6 @@ class TestBenchmark:
     def test_throughput(self, size, batch):
         import time
         x = torch.rand(batch, 3, size, size)
-        # warmup
         for _ in range(3):
             blur(x, 0.5, seed=1)
         N = 10
@@ -484,11 +417,9 @@ class TestBenchmark:
             blur(x, 0.5, seed=1)
         dt = (time.perf_counter() - t0) / N
         print(f"\n[bench] {batch}×3×{size}×{size}: {dt*1000:.1f} ms")
-        # Ambang kasar — sesuaikan untuk CI:
         assert dt < 5.0, f"too slow: {dt:.3f}s"
 
     def test_throughput_scaling(self):
-        """Verifikasi batch scaling linear-ish (tidak ada O(B²))."""
         import time
 
         def timeit(B):
@@ -502,5 +433,4 @@ class TestBenchmark:
 
         t1 = timeit(1)
         t4 = timeit(4)
-        # O(B²) akan ~16×, O(B) akan ~4×. Beri margin longgar.
         assert t4 < t1 * 8.0, f"non-linear scaling: t1={t1:.4f}s t4={t4:.4f}s"
