@@ -284,12 +284,12 @@ class TestRobustness:
         assert torch.isfinite(y).all()
         # fp32 tidak eksak untuk 0.01 → abs=1e-5 cukup longgar untuk lolos,
         # cukup ketat untuk menangkap perubahan clamp.
-        assert lab[1].item() == pytest.approx(0.01, abs=1e-5)
+        assert lab[0, 1].item() == pytest.approx(0.01, abs=1e-5)
 
     def test_severity_out_of_range_high(self, x_rgb):
         y, lab = blur(x_rgb, 99.0, seed=1)
         assert torch.isfinite(y).all()
-        assert lab[1].item() == pytest.approx(1.0, abs=1e-6)
+        assert lab[0, 1].item() == pytest.approx(1.0, abs=1e-6)
 
     def test_severity_scalar_broadcast(self, x_batch4):
         _, lab = blur(x_batch4, 0.5, seed=1)
@@ -368,7 +368,7 @@ class TestLabel:
 
     def test_label_id_constant(self, x_rgb):
         _, lab = blur(x_rgb, 0.5, seed=1)
-        assert lab[0].item() == float(_ID)
+        assert lab[0, 0].item() == float(_ID)
 
     def test_label_device(self, x_rgb):
         _, lab = blur(x_rgb, 0.5, seed=1)
