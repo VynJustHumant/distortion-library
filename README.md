@@ -10,10 +10,12 @@ and physics-based augmentation for computer vision.
 
 ## What This Is
 
-Physics-based distortion modules for CV robustness testing. Every module is:
+Physics-based distortion modules for CV robustness testing and synthetic
+dataset generation. Every module is:
 
 - **Physics-based** — moiré emerges from transmittance products, noise
-  follows Poisson-Gaussian, turbulence follows Kolmogorov.
+  follows Poisson-Gaussian, turbulence follows Kolmogorov, FRC blur uses
+  optical-flow temporal integration.
 - **Differentiable** — end-to-end, `gradcheck`-clean.
 - **Reproducible** — SHA-256 deterministic per-sample seeding.
 - **Batch-invariant** — single sample output equals its batch counterpart.
@@ -21,35 +23,79 @@ Physics-based distortion modules for CV robustness testing. Every module is:
 
 ## Available Distortions
 
-| ID   | Name                        | Category  | Input            |
-|------|-----------------------------|-----------|------------------|
-| 1004 | Atmospheric Turbulence Blur | Optical   | Image            |
-| 1005 | FRC Optical Flow Blur       | Temporal  | Image + Video    |
+| ID   | Name                        | Category  | Input          |
+|------|-----------------------------|-----------|----------------|
+| 1004 | Atmospheric Turbulence Blur | Optical   | Image          |
+| —    | FRC Optical Flow Blur       | Temporal  | Image + Video  |
 
-*Image* = `(C,H,W)` and `(B,C,H,W)`; *Video* = also `(B,T,C,H,W)`.
+**Legend:**
+- *Image* = `(C,H,W)` and `(B,C,H,W)`
+- *Video* = also `(B,T,C,H,W)`
 
 ## Quick Start
 
-### Static image
+### Static image — atmospheric turbulence
 
 ```python
 import torch
 from distortion_library import blur_atmospheric_turbulence_v1
 
-x = torch.rand(1, 3, 256, 256)
+x = torch.rand(1, 3, 256, 256)          # (B, C, H, W)
 distorted, label = blur_atmospheric_turbulence_v1(x, severity=0.5, seed=42)
-Video (temporal)
-python
+# label = [1004.0, 0.5]
+```
+
+### Video — FRC optical flow blur
+
+```python
 from distortion_library import blur_frc_optical_flow_v1
 
 video = torch.rand(2, 8, 3, 128, 128)   # (B, T, C, H, W)
 distorted, label = blur_frc_optical_flow_v1(video, severity=0.5, seed=42)
-Installation
-bash
+# label = [DISTORTION_ID, 0.5]
+```
+
+## Visual Output
+
+### FRC Optical Flow Blur — Severity Sweep
+
+![FRC Severity Sweep](examples/outputs/sweep_frc_optical_flow.png)
+
+Input image followed by seven increasing severities (0.05 → 1.00), all
+rendered from the same seed so the differences are attributable purely
+to severity.
+
+## Installation
+
+```bash
 pip install -r requirements.txt
-Testing
-bash
+```
+
+## Testing
+
+```bash
 pytest tests/ -v -m "not benchmark"
 ```
+
+## Architecture
+
+Every distortion follows the same wrapper contract:
+
+```python
+def xxx_wrapper(
+    image: torch.Tensor,
+    severity,
+    seed=None,
+    generator=None,
+    value_range=(0.0, 1.0),
+    **kwargs,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Returns (distorted_image, label)."""
+```
+
+See [`DEVELOPMENT.md`](DEVELOPMENT.md) for the full development workflow.
+
 ## License
-MIT — see LICENSE.
+
+MIT — see [LICENSE](LICENSE).
+```
