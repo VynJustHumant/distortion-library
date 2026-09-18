@@ -13,9 +13,9 @@ and physics-based augmentation for computer vision.
 Physics-based distortion modules for CV robustness testing and synthetic
 dataset generation. Every module is:
 
-- **Physics-based** — moiré emerges from transmittance products, noise
-  follows Poisson-Gaussian, turbulence follows Kolmogorov, FRC blur uses
-  optical-flow temporal integration.
+- **Physics-based** — turbulence follows Kolmogorov, FRC blur uses
+  optical-flow temporal integration, JPEG re-compression follows DCT
+  quantization with multi-generation accumulation.
 - **Differentiable** — end-to-end, `gradcheck`-clean.
 - **Reproducible** — SHA-256 deterministic per-sample seeding.
 - **Batch-invariant** — single sample output equals its batch counterpart.
@@ -23,10 +23,11 @@ dataset generation. Every module is:
 
 ## Available Distortions
 
-| ID   | Name                        | Category  | Input          |
-|------|-----------------------------|-----------|----------------|
-| 1004 | Atmospheric Turbulence Blur | Optical   | Image          |
-| —    | FRC Optical Flow Blur       | Temporal  | Image + Video  |
+| ID   | Name                            | Category    | Input          |
+|------|---------------------------------|-------------|----------------|
+| 1004 | Atmospheric Turbulence Blur     | Optical     | Image          |
+| —    | FRC Optical Flow Blur           | Temporal    | Image + Video  |
+| 1006 | Multi-Generation Re-Compression | Compression | Image (RGB)    |
 
 **Legend:**
 - *Image* = `(C,H,W)` and `(B,C,H,W)`
@@ -52,7 +53,15 @@ from distortion_library import blur_frc_optical_flow_v1
 
 video = torch.rand(2, 8, 3, 128, 128)   # (B, T, C, H, W)
 distorted, label = blur_frc_optical_flow_v1(video, severity=0.5, seed=42)
-# label = [DISTORTION_ID, 0.5]
+```
+
+### RGB image — JPEG re-compression
+
+```python
+from distortion_library import compression_recompression_v1
+
+x = torch.rand(2, 3, 256, 256)          # (B, C, H, W)
+distorted, label = compression_recompression_v1(x, severity=0.5)
 ```
 
 ## Visual Output
@@ -72,6 +81,16 @@ Input image followed by seven increasing severities (0.05 → 1.00), all
 rendered from the same seed so the differences are attributable purely
 to severity.
 
+### Multi-Generation Re-Compression — Severity Sweep
+
+![Compression Sweep Grid](examples/outputs/sweep_compression/sweep_grid.png)
+
+Three test patterns (checkerboard, gradient, smooth) at seven severities.
+The checkerboard exposes 8×8 block artifacts; the gradient reveals
+banding; MSE vs. severity curve:
+
+![Compression MSE Curve](examples/outputs/sweep_compression/mse_vs_severity.png)
+
 ## Installation
 
 ```bash
@@ -81,7 +100,7 @@ pip install -r requirements.txt
 ## Testing
 
 ```bash
-pytest tests/ -v -m "not benchmark"
+pytest tests/ -v -m "not benchmark and not slow"
 ```
 
 ## Architecture
