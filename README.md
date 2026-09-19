@@ -28,6 +28,7 @@ dataset generation. Every module is:
 | 1004 | Atmospheric Turbulence Blur     | Optical     | Image          |
 | —    | FRC Optical Flow Blur           | Temporal    | Image + Video  |
 | 1006 | Multi-Generation Re-Compression | Compression | Image (RGB)    |
+| 1007 | Multi-Generation Video Transcode Cascade | Temporal | Video (RGB) |
 
 **Legend:**
 - *Image* = `(C,H,W)` and `(B,C,H,W)`
@@ -64,6 +65,16 @@ x = torch.rand(2, 3, 256, 256)          # (B, C, H, W)
 distorted, label = compression_recompression_v1(x, severity=0.5)
 ```
 
+### Video — multi-generation transcode cascade
+
+```python
+from distortion_library import mgtc_cascade_v1
+
+video = torch.rand(2, 8, 3, 128, 128)   # (B, T, C, H, W)
+distorted, label = mgtc_cascade_v1(video, severity=0.5)
+# label = [1007.0, 0.5]
+```
+
 ## Visual Output
 
 ### Atmospheric Turbulence Blur — Severity Sweep
@@ -90,6 +101,14 @@ The checkerboard exposes 8×8 block artifacts; the gradient reveals
 banding; MSE vs. severity curve:
 
 ![Compression MSE Curve](examples/outputs/sweep_compression/mse_vs_severity.png)
+
+### Multi-Generation Video Transcode Cascade — Severity Sweep
+
+![MGTC Sweep](examples/outputs/sweep_mgtc_cascade_v1.png)
+
+Eight-frame clip at six severities (0.01 → 1.00). Temporal drift and
+deblocking artifacts accumulate across I/P frames; MSE grows monotonically
+with severity.
 
 ## Installation
 
