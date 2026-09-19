@@ -10,6 +10,7 @@ from .compression_recompression_v1 import (
     distortion as compression_recompression_v1,
 )
 from .mgtc_cascade_v1 import mgtc_cascade_v1
+from .speckle_coherent_v1 import distortion as speckle_coherent_v1
 
 try:
     from .motion_blur_linear import DISTORTION_REGISTRY
@@ -24,4 +25,5 @@ __all__ = [
     "blur_frc_optical_flow_v1",
     "compression_recompression_v1",
     "mgtc_cascade_v1",
+    "speckle_coherent_v1",
 ]
