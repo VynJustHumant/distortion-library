@@ -15,24 +15,28 @@ dataset generation. Every module is:
 
 - **Physics-based** — turbulence follows Kolmogorov, FRC blur uses
   optical-flow temporal integration, JPEG re-compression follows DCT
-  quantization with multi-generation accumulation.
+  quantization with multi-generation accumulation, speckle follows
+  multiplicative coherent-imaging statistics.
 - **Differentiable** — end-to-end, `gradcheck`-clean.
-- **Reproducible** — SHA-256 deterministic per-sample seeding.
-- **Batch-invariant** — single sample output equals its batch counterpart.
+- **Reproducible** — deterministic per-sample seeding (BLAKE2b-64).
+- **Batch-invariant** — per-path RNG keyed by `(seed, batch_index)`;
+  same batch + seed reproduces bit-identically.
 - **Tested** — pytest suite per module.
 
 ## Available Distortions
 
-| ID   | Name                            | Category    | Input          |
-|------|---------------------------------|-------------|----------------|
-| 1004 | Atmospheric Turbulence Blur     | Optical     | Image          |
-| —    | FRC Optical Flow Blur           | Temporal    | Image + Video  |
-| 1006 | Multi-Generation Re-Compression | Compression | Image (RGB)    |
-| 1007 | Multi-Generation Video Transcode Cascade | Temporal | Video (RGB) |
+| ID   | Name                                     | Category    | Input          |
+|------|------------------------------------------|-------------|----------------|
+| 1004 | Atmospheric Turbulence Blur              | Optical     | Image          |
+| —    | FRC Optical Flow Blur                    | Temporal    | Image + Video  |
+| 1006 | Multi-Generation Re-Compression          | Compression | Image (RGB)    |
+| 1007 | Multi-Generation Video Transcode Cascade | Temporal    | Video (RGB)    |
+| 1008 | Speckle Noise (Coherent Imaging)         | Noise       | Image (linear) |
 
 **Legend:**
 - *Image* = `(C,H,W)` and `(B,C,H,W)`
 - *Video* = also `(B,T,C,H,W)`
+- *linear* = scene-referred linear intensity (linearize sRGB before use)
 
 ## Quick Start
 
@@ -75,6 +79,22 @@ distorted, label = mgtc_cascade_v1(video, severity=0.5)
 # label = [1007.0, 0.5]
 ```
 
+### Linear-intensity image — speckle noise (SAR / laser / ultrasound)
+
+```python
+from distortion_library import speckle_coherent_v1
+
+x = torch.rand(2, 3, 256, 256)          # (B, C, H, W), linear intensity
+distorted, label = speckle_coherent_v1(x, severity=0.5, seed=42)
+# label = [1008.0, 0.5]
+
+# Spatially-correlated speckle (PSF-modelled) for realistic SAR imagery:
+distorted, _ = speckle_coherent_v1(x, severity=0.5, rho=2.0, seed=42)
+```
+
+**Note:** this module expects *linear intensity* input (scene-referred).
+Linearize sRGB before use and re-encode after.
+
 ## Visual Output
 
 ### Atmospheric Turbulence Blur — Severity Sweep
@@ -109,6 +129,14 @@ banding; MSE vs. severity curve:
 Eight-frame clip at six severities (0.01 → 1.00). Temporal drift and
 deblocking artifacts accumulate across I/P frames; MSE grows monotonically
 with severity.
+
+### Speckle Noise — Severity Sweep
+
+![Speckle Sweep](examples/outputs/sweep_speckle_coherent_v1.png)
+
+Five severities (0.01 → 1.00). Columns: [clean | i.i.d. lognormal |
+spatially correlated ρ = 2.0]. The correlated column preserves the
+multiplicative mean while introducing PSF-scale graininess.
 
 ## Installation
 
