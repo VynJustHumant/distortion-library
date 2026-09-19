@@ -478,16 +478,18 @@ def test_blur_kernel_cached():
 
 
 def test_blur_r_computed_once(monkeypatch):
-    from distortion_library.mgtc_cascade_v1 import _gaussian_blur, _make_blur_kernel
+    import importlib
+    mod = importlib.import_module("distortion_library.mgtc_cascade_v1")
+    from distortion_library.mgtc_cascade_v1 import _gaussian_blur
     saved = _snapshot_and_clear(_BLUR_CACHE)
     try:
         sigma = 0.321
         calls = {"n": 0}
-        orig = _make_blur_kernel
+        orig = mod._make_blur_kernel
         def counted(*a, **kw):
             calls["n"] += 1
             return orig(*a, **kw)
-        monkeypatch.setattr("distortion_library.mgtc_cascade_v1._make_blur_kernel", counted)
+        monkeypatch.setattr(mod, "_make_blur_kernel", counted)
 
         x = torch.rand(1, 3, 32, 32)
         _gaussian_blur(x, sigma=sigma)
@@ -498,8 +500,9 @@ def test_blur_r_computed_once(monkeypatch):
 
 
 def test_cache_is_bounded(monkeypatch):
-    import distortion_library.mgtc_cascade_v1 as mod
-    from distortion_library.mgtc_cascade_v1 import _get_dct
+    import importlib
+    mod = importlib.import_module("distortion_library.mgtc_cascade_v1")
+    _get_dct = mod._get_dct
     monkeypatch.setattr(mod, "_STRUCT_MAX", 8)
     saved = _snapshot_and_clear(_STRUCT_CACHE)
     try:
