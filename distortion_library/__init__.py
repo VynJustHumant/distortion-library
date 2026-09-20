@@ -11,6 +11,7 @@ from .compression_recompression_v1 import (
 )
 from .mgtc_cascade_v1 import mgtc_cascade_v1
 from .speckle_coherent_v1 import distortion as speckle_coherent_v1
+from .hdr_mef_noise_mismatch_v1 import hdr_mef_noise_mismatch_v1
 
 try:
     from .motion_blur_linear import DISTORTION_REGISTRY
@@ -26,4 +27,5 @@ __all__ = [
     "compression_recompression_v1",
     "mgtc_cascade_v1",
     "speckle_coherent_v1",
+    "hdr_mef_noise_mismatch_v1",
 ]
