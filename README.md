@@ -16,7 +16,8 @@ dataset generation. Every module is:
 - **Physics-based** — turbulence follows Kolmogorov, FRC blur uses
   optical-flow temporal integration, JPEG re-compression follows DCT
   quantization with multi-generation accumulation, speckle follows
-  multiplicative coherent-imaging statistics.
+  multiplicative coherent-imaging statistics, HDR fusion noise follows
+  bracket-dependent shot + read + quantization statistics.
 - **Differentiable** — end-to-end, `gradcheck`-clean.
 - **Reproducible** — deterministic per-sample seeding (BLAKE2b-64).
 - **Batch-invariant** — per-path RNG keyed by `(seed, batch_index)`;
@@ -28,10 +29,11 @@ dataset generation. Every module is:
 | ID   | Name                                     | Category    | Input          |
 |------|------------------------------------------|-------------|----------------|
 | 1004 | Atmospheric Turbulence Blur              | Optical     | Image          |
-| —    | FRC Optical Flow Blur                    | Temporal    | Image + Video  |
+| 1005 | FRC Optical Flow Blur                    | Temporal    | Image + Video  |
 | 1006 | Multi-Generation Re-Compression          | Compression | Image (RGB)    |
 | 1007 | Multi-Generation Video Transcode Cascade | Temporal    | Video (RGB)    |
 | 1008 | Speckle Noise (Coherent Imaging)         | Noise       | Image (linear) |
+| 1009 | HDR Multi-Exposure Fusion Noise Mismatch | Noise       | Image / Video  |
 
 **Legend:**
 - *Image* = `(C,H,W)` and `(B,C,H,W)`
@@ -95,6 +97,31 @@ distorted, _ = speckle_coherent_v1(x, severity=0.5, rho=2.0, seed=42)
 **Note:** this module expects *linear intensity* input (scene-referred).
 Linearize sRGB before use and re-encode after.
 
+### HDR multi-exposure fusion noise mismatch
+
+```python
+from distortion_library import hdr_mef_noise_mismatch_v1
+
+x = torch.rand(2, 3, 256, 256)          # (B, C, H, W)
+distorted, label = hdr_mef_noise_mismatch_v1(x, severity=0.5, seed=42)
+# label = [1009.0, 0.5]
+
+# Video: temporal AR(1) drift of the noise field across frames:
+video = torch.rand(1, 8, 3, 128, 128)   # (B, T, C, H, W)
+distorted, _ = hdr_mef_noise_mismatch_v1(video, severity=0.7, rho_t=0.9, seed=42)
+
+# Custom exposure bracketing:
+distorted, _ = hdr_mef_noise_mismatch_v1(
+    x, severity=0.5, K=5, ev_min=-3.0, ev_max=3.0, seed=42
+)
+```
+
+Models a virtual multi-exposure capture + fusion pipeline: sRGB linearization,
+per-bracket saturating exposure gain, bracket-dependent shot + read +
+quantization noise, spatially-correlated unit-variance Gaussian noise,
+temporal AR(1) correlation across frames, per-bracket fixed-pattern noise,
+and a mixture of naive well-exposedness and inverse-variance fusion weights.
+
 ## Visual Output
 
 ### Atmospheric Turbulence Blur — Severity Sweep
@@ -137,6 +164,15 @@ with severity.
 Five severities (0.01 → 1.00). Columns: [clean | i.i.d. lognormal |
 spatially correlated ρ = 2.0]. The correlated column preserves the
 multiplicative mean while introducing PSF-scale graininess.
+
+### HDR MEF Noise Mismatch — Severity Sweep
+
+![HDR MEF Sweep](examples/outputs/sweep_hdr_mef_noise_mismatch_v1.png)
+
+Synthetic gradient scene at six severities (0.01 → 1.00). The distortion
+combines virtual multi-exposure fusion noise (shot + read + quantization),
+spatial correlation, and per-bracket weighting; visual grain grows with
+severity and reveals the fusion-weight transitions between brackets.
 
 ## Installation
 
