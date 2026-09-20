@@ -76,6 +76,7 @@ def test_package_all_complete():
         "compression_recompression_v1",
         "mgtc_cascade_v1",
         "speckle_coherent_v1",
+        "hdr_mef_noise_mismatch_v1",
     }
     assert set(dl.__all__) == expected
 
