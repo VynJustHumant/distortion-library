@@ -16,8 +16,9 @@ permissions:
 
 jobs:
   test:
+    name: py${{ matrix.python-version }}
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -37,9 +38,22 @@ jobs:
       - name: Install other dependencies
         run: |
           pip install --upgrade pip
-          pip install numpy pillow pytest
+          pip install numpy pillow pytest matplotlib
+
+      - name: Show environment
+        run: |
+          python -c "import sys, torch, numpy; print('python', sys.version.split()[0]); print('torch', torch.__version__); print('numpy', numpy.__version__)"
 
       - name: Run tests
         env:
           PYTHONPATH: ${{ github.workspace }}
         run: pytest tests/ -v -m "not benchmark and not slow"
+
+      - name: Upload pytest cache on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-cache-py${{ matrix.python-version }}
+          path: .pytest_cache/
+          retention-days: 7
+          if-no-files-found: ignore
